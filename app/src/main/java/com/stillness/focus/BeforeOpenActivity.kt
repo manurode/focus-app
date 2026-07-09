@@ -88,8 +88,7 @@ class BeforeOpenActivity : ComponentActivity() {
                         finish()
                     },
                     onBack = {
-                        cancelRecording()
-                        SessionManager.onBeforeScreenDismissed()
+                        abandonBeforeOpenIfIncomplete()
                         goHome()
                         finish()
                     },
@@ -143,12 +142,32 @@ class BeforeOpenActivity : ComponentActivity() {
         hasRecording = false
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        abandonBeforeOpenIfIncomplete()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!proceeded && !isChangingConfigurations) {
+            abandonBeforeOpenIfIncomplete()
+            finish()
+        }
+    }
+
     override fun onDestroy() {
         if (!proceeded) {
             cancelRecording()
+            SessionManager.cancelBeforeOpen()
         }
-        SessionManager.onBeforeScreenDismissed()
         super.onDestroy()
+    }
+
+    private fun abandonBeforeOpenIfIncomplete() {
+        if (!proceeded && !isChangingConfigurations) {
+            cancelRecording()
+            SessionManager.cancelBeforeOpen()
+        }
     }
 
     private fun deleteRecordingFile(path: String) {

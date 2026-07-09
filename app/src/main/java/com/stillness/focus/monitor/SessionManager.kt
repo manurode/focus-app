@@ -63,6 +63,8 @@ object SessionManager {
         isBeforeScreenShowing.set(false)
     }
 
+    fun cancelBeforeOpen() = onBeforeScreenDismissed()
+
     fun onAfterScreenDismissed() {
         isAfterScreenShowing.set(false)
         clearSession()

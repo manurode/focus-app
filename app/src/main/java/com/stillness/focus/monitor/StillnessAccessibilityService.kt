@@ -42,6 +42,10 @@ class StillnessAccessibilityService : AccessibilityService() {
             SessionManager.cancelReflection()
         }
 
+        if (SessionManager.isBeforeScreenShowing.get()) {
+            SessionManager.cancelBeforeOpen()
+        }
+
         if (SessionManager.isBeforeScreenShowing.compareAndSet(false, true)) {
             val intent = BeforeOpenActivity.createIntent(this, packageName).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
