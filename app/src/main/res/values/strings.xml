@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stillness</string>
+    <string name="accessibility_service_label">Stillness App Monitor</string>
+    <string name="accessibility_service_description">Stillness needs this permission to detect when you open or leave selected apps, so it can help you pause with intention.</string>
+</resources>

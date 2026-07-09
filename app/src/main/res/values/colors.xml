@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#FF051424</color>
+    <color name="secondary_teal">#FF44E2CD</color>
+    <color name="on_surface">#FFD4E4FA</color>
+    <color name="surface_container_high">#FF1C2B3C</color>
+    <color name="surface_container">#FF122131</color>
+    <color name="outline_variant">#FF45474C</color>
+    <color name="on_secondary">#FF003731</color>
+</resources>

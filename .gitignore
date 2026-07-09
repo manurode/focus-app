@@ -1,0 +1,51 @@
+# Gradle — caché local y metadatos de build (se regeneran al compilar)
+.gradle/
+build/
+**/build/
+
+# Android — archivos generados y compilados
+*.apk
+*.aab
+*.ap_
+*.aar
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Configuración local de la máquina (ruta del SDK, etc.)
+local.properties
+
+# Android Studio / IntelliJ — estado del IDE (cada dev lo regenera al abrir el proyecto)
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Keystores y credenciales de firma (nunca en el repo)
+*.jks
+*.keystore
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# fastlane (si lo usas más adelante)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Lint generado
+**/lint/intermediates/
+**/lint/generated/
+**/lint/outputs/
+**/lint/tmp/
