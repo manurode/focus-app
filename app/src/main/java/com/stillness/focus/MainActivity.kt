@@ -37,6 +37,12 @@ class MainActivity : ComponentActivity() {
         AppStats,
     }
 
+    private val protectedRoutes = setOf(
+        MainRoute.Home,
+        MainRoute.Stats,
+        MainRoute.AppStats,
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -59,6 +65,11 @@ class MainActivity : ComponentActivity() {
                     installedApps.associateBy { it.packageName }
                 }
 
+                fun isAccessibilityEnabled() = StillnessAccessibilityService.isEnabled(this)
+
+                fun routeAfterSetup(): MainRoute =
+                    if (isAccessibilityEnabled()) MainRoute.Home else MainRoute.Permissions
+
                 suspend fun refreshStats() {
                     val statsByApp = preferences.getStatsForApps(blockedApps)
                     globalStats = aggregateStats(statsByApp)
@@ -74,18 +85,27 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                    val enabled = isAccessibilityEnabled()
+                    accessibilityEnabled = enabled
                     scope.launch { refreshStats() }
+
+                    when {
+                        !setupComplete -> Unit
+                        !enabled && route in protectedRoutes -> route = MainRoute.Permissions
+                        enabled && route == MainRoute.Permissions -> route = MainRoute.Home
+                    }
                 }
 
                 LaunchedEffect(setupComplete) {
                     route = when {
                         !setupComplete -> MainRoute.Setup
+                        !isAccessibilityEnabled() -> MainRoute.Permissions
                         else -> MainRoute.Home
                     }
                 }
 
                 LaunchedEffect(blockedApps, route) {
-                    if (route == MainRoute.Home || route == MainRoute.Stats || route == MainRoute.AppStats) {
+                    if (route in protectedRoutes) {
                         refreshStats()
                     }
                 }
@@ -98,7 +118,7 @@ class MainActivity : ComponentActivity() {
                             scope.launch {
                                 preferences.setBlockedApps(selected)
                                 route = if (setupComplete) {
-                                    MainRoute.Home
+                                    routeAfterSetup()
                                 } else {
                                     preferences.setSetupComplete(true)
                                     MainRoute.Permissions
@@ -106,7 +126,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onBack = if (setupComplete) {
-                            { route = MainRoute.Home }
+                            { route = routeAfterSetup() }
                         } else {
                             null
                         },
@@ -118,18 +138,18 @@ class MainActivity : ComponentActivity() {
                             openAccessibilitySettings(this)
                         },
                         onContinue = {
-                            accessibilityEnabled = StillnessAccessibilityService.isEnabled(this)
-                            route = MainRoute.Home
+                            accessibilityEnabled = isAccessibilityEnabled()
+                            if (accessibilityEnabled) {
+                                route = MainRoute.Home
+                            }
                         },
                     )
 
                     MainRoute.Home -> HomeScreen(
                         blockedCount = blockedApps.size,
-                        accessibilityEnabled = accessibilityEnabled,
                         globalStats = globalStats,
                         onViewStats = { route = MainRoute.Stats },
                         onEditApps = { route = MainRoute.Setup },
-                        onEnableAccessibility = { openAccessibilitySettings(this) },
                     )
 
                     MainRoute.Stats -> StatsOverviewScreen(

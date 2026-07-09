@@ -47,12 +47,16 @@ fun PermissionsScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "One more step",
+            text = if (accessibilityEnabled) "You're all set" else "Accessibility required",
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            text = "Stillness needs Accessibility access to detect when you open or leave your selected apps. Your data stays on your device.",
+            text = if (accessibilityEnabled) {
+                "Stillness can now detect when you open or leave your selected apps."
+            } else {
+                "Stillness needs Accessibility access to work. Without it, the app cannot intercept your selected apps. Your data stays on your device."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 12.dp),
@@ -64,29 +68,28 @@ fun PermissionsScreen(
             StillnessPrimaryButton(
                 text = "Enable in Settings",
                 onClick = onEnableAccessibility,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp),
             )
-            Spacer(modifier = Modifier.height(16.dp))
+        } else {
+            StillnessPrimaryButton(
+                text = "Continue",
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp),
+            )
         }
-
-        StillnessPrimaryButton(
-            text = if (accessibilityEnabled) "Continue" else "I've enabled it",
-            onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp),
-        )
     }
 }
 
 @Composable
 fun HomeScreen(
     blockedCount: Int,
-    accessibilityEnabled: Boolean,
     globalStats: PurposeStats,
     onViewStats: () -> Unit,
     onEditApps: () -> Unit,
-    onEnableAccessibility: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -121,34 +124,6 @@ fun HomeScreen(
         if (globalStats.hasData) {
             Spacer(modifier = Modifier.height(16.dp))
             AccomplishmentProgressCard(stats = globalStats)
-        }
-
-        if (!accessibilityEnabled) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceContainerHigh),
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(
-                        text = "Accessibility is disabled",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    Text(
-                        text = "Stillness cannot intercept apps until you enable it.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    StillnessPrimaryButton(
-                        text = "Enable in Settings",
-                        onClick = onEnableAccessibility,
-                    )
-                }
-            }
         }
 
         Spacer(modifier = Modifier.weight(1f))
