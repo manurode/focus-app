@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -45,4 +46,45 @@ class AppPreferences(private val context: Context) {
     fun isSetupCompleteBlocking(): Boolean = runBlocking {
         setupComplete.first()
     }
+
+    suspend fun recordAccomplished(packageName: String) {
+        context.dataStore.edit { prefs ->
+            val key = accomplishedKey(packageName)
+            prefs[key] = (prefs[key] ?: 0) + 1
+        }
+    }
+
+    suspend fun recordNotAccomplished(packageName: String) {
+        context.dataStore.edit { prefs ->
+            val key = notAccomplishedKey(packageName)
+            prefs[key] = (prefs[key] ?: 0) + 1
+        }
+    }
+
+    suspend fun getStats(packageName: String): PurposeStats {
+        return context.dataStore.data.first().let { prefs ->
+            PurposeStats(
+                accomplished = prefs[accomplishedKey(packageName)] ?: 0,
+                notAccomplished = prefs[notAccomplishedKey(packageName)] ?: 0,
+            )
+        }
+    }
+
+    fun recordAccomplishedBlocking(packageName: String) = runBlocking {
+        recordAccomplished(packageName)
+    }
+
+    fun recordNotAccomplishedBlocking(packageName: String) = runBlocking {
+        recordNotAccomplished(packageName)
+    }
+
+    fun getStatsBlocking(packageName: String): PurposeStats = runBlocking {
+        getStats(packageName)
+    }
+
+    private fun accomplishedKey(packageName: String) =
+        intPreferencesKey("stats_accomplished_$packageName")
+
+    private fun notAccomplishedKey(packageName: String) =
+        intPreferencesKey("stats_not_accomplished_$packageName")
 }
