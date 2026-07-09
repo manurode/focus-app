@@ -22,30 +22,32 @@ import com.stillness.focus.data.PurposeStats
 import com.stillness.focus.ui.components.AccomplishmentProgressCard
 import com.stillness.focus.ui.components.MindfulPausesCard
 import com.stillness.focus.ui.components.StatCard
-import com.stillness.focus.ui.components.StillnessPrimaryButton
+import com.stillness.focus.ui.components.StillnessTopBar
 import com.stillness.focus.ui.components.reflectionMessage
 import com.stillness.focus.ui.theme.SecondaryTeal
 import com.stillness.focus.ui.theme.TertiaryLavender
 
 @Composable
-fun PurposeStatsScreen(
+fun AppStatsDetailScreen(
     appLabel: String,
     stats: PurposeStats,
-    onContinue: () -> Unit,
+    onBack: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 20.dp),
     ) {
+        StillnessTopBar(title = appLabel, onBack = onBack)
+
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = "Your track record",
@@ -63,7 +65,7 @@ fun PurposeStatsScreen(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -83,12 +85,12 @@ fun PurposeStatsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             AccomplishmentProgressCard(stats = stats)
 
             if (stats.preventedEntries > 0) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 MindfulPausesCard(
                     count = stats.preventedEntries,
                     description = "Stillness stopped you from opening $appLabel without a clear purpose — " +
@@ -96,7 +98,7 @@ fun PurposeStatsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = reflectionMessage(stats, appLabel),
@@ -108,13 +110,5 @@ fun PurposeStatsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
-
-        StillnessPrimaryButton(
-            text = "Continue",
-            onClick = onContinue,
-            modifier = Modifier
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-        )
     }
 }

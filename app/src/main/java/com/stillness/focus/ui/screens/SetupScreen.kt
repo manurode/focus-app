@@ -123,7 +123,7 @@ fun SetupScreen(
         }
 
         StillnessPrimaryButton(
-            text = "Save and continue →",
+            text = if (onBack != null) "Save" else "Save and continue →",
             onClick = { onSave(selected) },
             enabled = selected.isNotEmpty(),
             modifier = Modifier.padding(vertical = 24.dp),

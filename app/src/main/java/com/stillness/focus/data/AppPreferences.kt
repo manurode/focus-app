@@ -94,6 +94,21 @@ class AppPreferences(private val context: Context) {
         getStats(packageName)
     }
 
+    suspend fun getStatsForApps(packageNames: Set<String>): Map<String, PurposeStats> {
+        val prefs = context.dataStore.data.first()
+        return packageNames.associateWith { packageName ->
+            PurposeStats(
+                accomplished = prefs[accomplishedKey(packageName)] ?: 0,
+                notAccomplished = prefs[notAccomplishedKey(packageName)] ?: 0,
+                preventedEntries = prefs[preventedEntryKey(packageName)] ?: 0,
+            )
+        }
+    }
+
+    fun getStatsForAppsBlocking(packageNames: Set<String>): Map<String, PurposeStats> = runBlocking {
+        getStatsForApps(packageNames)
+    }
+
     private fun accomplishedKey(packageName: String) =
         intPreferencesKey("stats_accomplished_$packageName")
 
