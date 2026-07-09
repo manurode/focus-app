@@ -25,6 +25,7 @@ class AfterCloseActivity : ComponentActivity() {
     private val audioPlayer = PurposeAudioPlayer()
     private var isPlaying by mutableStateOf(false)
     private var playbackProgress by mutableFloatStateOf(0f)
+    private var reflectionCompleted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,13 +112,36 @@ class AfterCloseActivity : ComponentActivity() {
         playbackProgress = 0f
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        abandonReflectionIfIncomplete()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!reflectionCompleted && !isChangingConfigurations) {
+            abandonReflectionIfIncomplete()
+            finish()
+        }
+    }
+
     override fun onDestroy() {
         audioPlayer.release()
-        SessionManager.isAfterScreenShowing.set(false)
+        if (!reflectionCompleted) {
+            SessionManager.cancelReflection()
+        }
         super.onDestroy()
     }
 
+    private fun abandonReflectionIfIncomplete() {
+        if (!reflectionCompleted && !isChangingConfigurations) {
+            stopPlayback()
+            SessionManager.cancelReflection()
+        }
+    }
+
     private fun finishReflection() {
+        reflectionCompleted = true
         SessionManager.onAfterScreenDismissed()
         finish()
     }

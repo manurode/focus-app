@@ -67,4 +67,6 @@ object SessionManager {
         isAfterScreenShowing.set(false)
         clearSession()
     }
+
+    fun cancelReflection() = onAfterScreenDismissed()
 }

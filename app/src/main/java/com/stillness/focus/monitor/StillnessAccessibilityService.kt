@@ -31,9 +31,15 @@ class StillnessAccessibilityService : AccessibilityService() {
     }
 
     private fun handleBlockedAppOpened(packageName: String) {
-        if (SessionManager.allowedPackage == packageName) {
+        if (SessionManager.allowedPackage == packageName &&
+            !SessionManager.isAfterScreenShowing.get()
+        ) {
             SessionManager.markActiveInBlockedApp(packageName)
             return
+        }
+
+        if (SessionManager.isAfterScreenShowing.get()) {
+            SessionManager.cancelReflection()
         }
 
         if (SessionManager.isBeforeScreenShowing.compareAndSet(false, true)) {
