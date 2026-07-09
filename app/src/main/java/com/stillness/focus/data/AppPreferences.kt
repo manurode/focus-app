@@ -61,11 +61,19 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun recordPreventedEntry(packageName: String) {
+        context.dataStore.edit { prefs ->
+            val key = preventedEntryKey(packageName)
+            prefs[key] = (prefs[key] ?: 0) + 1
+        }
+    }
+
     suspend fun getStats(packageName: String): PurposeStats {
         return context.dataStore.data.first().let { prefs ->
             PurposeStats(
                 accomplished = prefs[accomplishedKey(packageName)] ?: 0,
                 notAccomplished = prefs[notAccomplishedKey(packageName)] ?: 0,
+                preventedEntries = prefs[preventedEntryKey(packageName)] ?: 0,
             )
         }
     }
@@ -78,6 +86,10 @@ class AppPreferences(private val context: Context) {
         recordNotAccomplished(packageName)
     }
 
+    fun recordPreventedEntryBlocking(packageName: String) = runBlocking {
+        recordPreventedEntry(packageName)
+    }
+
     fun getStatsBlocking(packageName: String): PurposeStats = runBlocking {
         getStats(packageName)
     }
@@ -87,4 +99,7 @@ class AppPreferences(private val context: Context) {
 
     private fun notAccomplishedKey(packageName: String) =
         intPreferencesKey("stats_not_accomplished_$packageName")
+
+    private fun preventedEntryKey(packageName: String) =
+        intPreferencesKey("stats_prevented_entry_$packageName")
 }

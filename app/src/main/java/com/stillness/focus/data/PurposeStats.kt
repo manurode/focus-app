@@ -3,6 +3,7 @@ package com.stillness.focus.data
 data class PurposeStats(
     val accomplished: Int = 0,
     val notAccomplished: Int = 0,
+    val preventedEntries: Int = 0,
 ) {
     val total: Int get() = accomplished + notAccomplished
 

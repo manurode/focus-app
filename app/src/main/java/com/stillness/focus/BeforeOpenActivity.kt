@@ -27,6 +27,8 @@ class BeforeOpenActivity : ComponentActivity() {
     private val audioRecorder = PurposeAudioRecorder(this)
     private var recording: PurposeRecording? = null
     private var proceeded = false
+    private var preventedEntryRecorded = false
+    private var targetPackage: String? = null
 
     private var isRecording by mutableStateOf(false)
     private var hasRecording by mutableStateOf(false)
@@ -43,14 +45,15 @@ class BeforeOpenActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
-        if (targetPackage == null) {
+        val packageName = intent.getStringExtra(EXTRA_TARGET_PACKAGE)
+        if (packageName == null) {
             SessionManager.onBeforeScreenDismissed()
             finish()
             return
         }
+        targetPackage = packageName
 
-        val appLabel = InstalledAppsRepository(this).getAppLabel(targetPackage)
+        val appLabel = InstalledAppsRepository(this).getAppLabel(packageName)
         var purpose by mutableStateOf("")
 
         setContent {
@@ -78,16 +81,17 @@ class BeforeOpenActivity : ComponentActivity() {
                         proceeded = true
                         val currentRecording = recording
                         SessionManager.grantAccess(
-                            packageName = targetPackage,
+                            packageName = packageName,
                             purpose = purpose.trim(),
                             audioPath = currentRecording?.filePath,
                             audioDurationMs = currentRecording?.durationMs ?: 0L,
                             waveformSamples = currentRecording?.waveformSamples ?: emptyList(),
                         )
-                        launchTargetApp(targetPackage)
+                        launchTargetApp(packageName)
                         finish()
                     },
                     onBack = {
+                        recordPreventedEntryIfNeeded()
                         abandonBeforeOpenIfIncomplete()
                         goHome()
                         finish()
@@ -144,6 +148,7 @@ class BeforeOpenActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
+        recordPreventedEntryIfNeeded()
         abandonBeforeOpenIfIncomplete()
     }
 
@@ -168,6 +173,13 @@ class BeforeOpenActivity : ComponentActivity() {
             cancelRecording()
             SessionManager.cancelBeforeOpen()
         }
+    }
+
+    private fun recordPreventedEntryIfNeeded() {
+        if (proceeded || preventedEntryRecorded || isChangingConfigurations) return
+        val packageName = targetPackage ?: return
+        preventedEntryRecorded = true
+        (application as StillnessApp).preferences.recordPreventedEntryBlocking(packageName)
     }
 
     private fun deleteRecordingFile(path: String) {
