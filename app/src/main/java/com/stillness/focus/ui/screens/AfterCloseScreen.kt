@@ -56,7 +56,7 @@ fun AfterCloseScreen(
             .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(modifier = Modifier.height(72.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = "Have you accomplished\nyour purpose?",
