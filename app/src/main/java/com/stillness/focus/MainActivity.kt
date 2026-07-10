@@ -24,6 +24,7 @@ import com.stillness.focus.data.InstalledAppsRepository
 import com.stillness.focus.data.PurposeStats
 import com.stillness.focus.data.aggregateStats
 import com.stillness.focus.monitor.StillnessAccessibilityService
+import com.stillness.focus.monitor.UnlockMonitorController
 import com.stillness.focus.ui.components.RetainedRoute
 import com.stillness.focus.ui.screens.AppStatsDetailScreen
 import com.stillness.focus.ui.screens.AppStatsEntry
@@ -61,12 +62,14 @@ class MainActivity : ComponentActivity() {
             StillnessTheme {
                 val setupComplete by preferences.setupComplete.collectAsStateWithLifecycle(initialValue = false)
                 val blockedApps by preferences.blockedApps.collectAsStateWithLifecycle(initialValue = emptySet())
+                val unlockMonitoringEnabled by preferences.unlockMonitoringEnabled.collectAsStateWithLifecycle(initialValue = false)
                 var route by remember { mutableStateOf<MainRoute?>(null) }
                 var visitedRoutes by remember { mutableStateOf(setOf<MainRoute>()) }
                 var selectedAppPackage by remember { mutableStateOf<String?>(null) }
                 var accessibilityEnabled by remember { mutableStateOf(StillnessAccessibilityService.isEnabled(this)) }
                 var appStats by remember { mutableStateOf<List<AppStatsEntry>>(emptyList()) }
                 var globalStats by remember { mutableStateOf(PurposeStats()) }
+                var unlockStats by remember { mutableStateOf(PurposeStats()) }
                 val scope = rememberCoroutineScope()
                 val installedApps = remember { appsRepository.getLaunchableApps() }
                 val installedAppsByPackage = remember(installedApps) {
@@ -80,6 +83,7 @@ class MainActivity : ComponentActivity() {
 
                 suspend fun refreshStats() {
                     val statsByApp = preferences.getStatsForApps(blockedApps)
+                    unlockStats = preferences.getUnlockStats()
                     globalStats = aggregateStats(statsByApp)
                     appStats = blockedApps.map { packageName ->
                         val app = installedAppsByPackage[packageName]
@@ -160,6 +164,8 @@ class MainActivity : ComponentActivity() {
                             visitedRoutes = visitedRoutes,
                             blockedApps = blockedApps,
                             globalStats = globalStats,
+                            unlockStats = unlockStats,
+                            unlockMonitoringEnabled = unlockMonitoringEnabled,
                             appStats = appStats,
                             selectedAppPackage = selectedAppPackage,
                             installedApps = installedApps,
@@ -173,6 +179,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onSetupBack = { route = routeAfterSetup() },
+                            onUnlockMonitoringChange = { enabled ->
+                                scope.launch {
+                                    preferences.setUnlockMonitoringEnabled(enabled)
+                                    UnlockMonitorController.sync(this@MainActivity)
+                                }
+                            },
                         )
                     }
 
@@ -199,6 +211,8 @@ class MainActivity : ComponentActivity() {
                         visitedRoutes = visitedRoutes,
                         blockedApps = blockedApps,
                         globalStats = globalStats,
+                        unlockStats = unlockStats,
+                        unlockMonitoringEnabled = unlockMonitoringEnabled,
                         appStats = appStats,
                         selectedAppPackage = selectedAppPackage,
                         installedApps = installedApps,
@@ -212,6 +226,12 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onSetupBack = { route = routeAfterSetup() },
+                        onUnlockMonitoringChange = { enabled ->
+                            scope.launch {
+                                preferences.setUnlockMonitoringEnabled(enabled)
+                                UnlockMonitorController.sync(this@MainActivity)
+                            }
+                        },
                         )
                     }
 
@@ -224,6 +244,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         invalidateOptionsMenu()
+        UnlockMonitorController.sync(this)
     }
 
     @Composable
@@ -232,6 +253,8 @@ class MainActivity : ComponentActivity() {
         visitedRoutes: Set<MainRoute>,
         blockedApps: Set<String>,
         globalStats: PurposeStats,
+        unlockStats: PurposeStats,
+        unlockMonitoringEnabled: Boolean,
         appStats: List<AppStatsEntry>,
         selectedAppPackage: String?,
         installedApps: List<InstalledApp>,
@@ -240,6 +263,7 @@ class MainActivity : ComponentActivity() {
         onSelectApp: (String) -> Unit,
         onSaveApps: (Set<String>) -> Unit,
         onSetupBack: () -> Unit,
+        onUnlockMonitoringChange: (Boolean) -> Unit,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (MainRoute.Home in visitedRoutes || route == MainRoute.Home) {
@@ -247,6 +271,9 @@ class MainActivity : ComponentActivity() {
                     HomeScreen(
                         blockedCount = blockedApps.size,
                         globalStats = globalStats,
+                        unlockMonitoringEnabled = unlockMonitoringEnabled,
+                        unlockStats = unlockStats,
+                        onUnlockMonitoringChange = onUnlockMonitoringChange,
                         onViewStats = { onRouteChange(MainRoute.Stats) },
                         onEditApps = { onRouteChange(MainRoute.Setup) },
                     )
@@ -257,6 +284,8 @@ class MainActivity : ComponentActivity() {
                 RetainedRoute(visible = route == MainRoute.Stats) {
                     StatsOverviewScreen(
                         appStats = appStats,
+                        unlockStats = unlockStats,
+                        unlockMonitoringEnabled = unlockMonitoringEnabled,
                         onBack = { onRouteChange(MainRoute.Home) },
                         onAppClick = { packageName ->
                             onSelectApp(packageName)

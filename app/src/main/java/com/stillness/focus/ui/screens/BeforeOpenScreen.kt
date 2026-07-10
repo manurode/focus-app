@@ -43,7 +43,7 @@ import com.stillness.focus.ui.theme.SurfaceContainerHigh
 
 @Composable
 fun BeforeOpenScreen(
-    appLabel: String,
+    contextDescription: String,
     purpose: String,
     isRecording: Boolean,
     hasRecording: Boolean,
@@ -72,7 +72,7 @@ fun BeforeOpenScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            text = "Speak naturally or type below to clarify your intent for opening $appLabel.",
+            text = "Speak naturally or type below to clarify your intent for $contextDescription.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

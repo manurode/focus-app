@@ -3,4 +3,8 @@
     <string name="app_name">Stillness</string>
     <string name="accessibility_service_label">Stillness App Monitor</string>
     <string name="accessibility_service_description">Stillness needs this permission to detect when you open or leave selected apps, so it can help you pause with intention.</string>
+    <string name="unlock_monitor_channel_name">Unlock monitoring</string>
+    <string name="unlock_monitor_channel_description">Keeps Stillness active to ask for your purpose when you unlock your phone.</string>
+    <string name="unlock_monitor_notification_title">Stillness unlock monitoring</string>
+    <string name="unlock_monitor_notification_text">Watching for phone unlocks</string>
 </resources>

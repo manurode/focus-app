@@ -25,6 +25,24 @@ object SessionManager {
     val isBeforeScreenShowing = AtomicBoolean(false)
     val isAfterScreenShowing = AtomicBoolean(false)
 
+    @Volatile
+    var unlockSessionActive = false
+
+    @Volatile
+    var unlockPurposeNote: String = ""
+
+    @Volatile
+    var unlockPurposeAudioPath: String? = null
+
+    @Volatile
+    var unlockPurposeAudioDurationMs: Long = 0L
+
+    @Volatile
+    var unlockPurposeWaveformSamples: List<Float> = emptyList()
+
+    val isUnlockBeforeShowing = AtomicBoolean(false)
+    val isUnlockAfterShowing = AtomicBoolean(false)
+
     fun grantAccess(
         packageName: String,
         purpose: String,
@@ -71,4 +89,56 @@ object SessionManager {
     }
 
     fun cancelReflection() = onAfterScreenDismissed()
+
+    fun grantUnlockAccess(
+        purpose: String,
+        audioPath: String? = null,
+        audioDurationMs: Long = 0L,
+        waveformSamples: List<Float> = emptyList(),
+    ) {
+        unlockSessionActive = true
+        unlockPurposeNote = purpose
+        unlockPurposeAudioPath = audioPath
+        unlockPurposeAudioDurationMs = audioDurationMs
+        unlockPurposeWaveformSamples = waveformSamples
+        isUnlockBeforeShowing.set(false)
+    }
+
+    fun loadPendingUnlockReflection(
+        purpose: String,
+        audioPath: String?,
+        audioDurationMs: Long,
+        waveformSamples: List<Float>,
+    ) {
+        unlockPurposeNote = purpose
+        unlockPurposeAudioPath = audioPath
+        unlockPurposeAudioDurationMs = audioDurationMs
+        unlockPurposeWaveformSamples = waveformSamples
+    }
+
+    fun clearUnlockSession() {
+        unlockPurposeAudioPath?.let { path ->
+            runCatching { File(path).delete() }
+        }
+        unlockSessionActive = false
+        unlockPurposeNote = ""
+        unlockPurposeAudioPath = null
+        unlockPurposeAudioDurationMs = 0L
+        unlockPurposeWaveformSamples = emptyList()
+        isUnlockBeforeShowing.set(false)
+        isUnlockAfterShowing.set(false)
+    }
+
+    fun onUnlockBeforeScreenDismissed() {
+        isUnlockBeforeShowing.set(false)
+    }
+
+    fun cancelUnlockBeforeOpen() = onUnlockBeforeScreenDismissed()
+
+    fun onUnlockAfterScreenDismissed() {
+        isUnlockAfterShowing.set(false)
+        clearUnlockSession()
+    }
+
+    fun cancelUnlockReflection() = onUnlockAfterScreenDismissed()
 }

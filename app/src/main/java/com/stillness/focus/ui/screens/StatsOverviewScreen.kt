@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -50,10 +51,12 @@ data class AppStatsEntry(
 @Composable
 fun StatsOverviewScreen(
     appStats: List<AppStatsEntry>,
+    unlockStats: PurposeStats,
+    unlockMonitoringEnabled: Boolean,
     onBack: () -> Unit,
     onAppClick: (String) -> Unit,
 ) {
-    val globalStats = aggregateStats(appStats.associate { it.app.packageName to it.stats })
+    val globalStats = aggregateStats(appStats.associate { it.app.packageName to it.stats }) + unlockStats
     val appsWithData = appStats.filter { it.stats.hasData }
         .sortedByDescending { it.stats.total + it.stats.preventedEntries }
 
@@ -155,6 +158,27 @@ fun StatsOverviewScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                 }
+            }
+
+            if (unlockMonitoringEnabled || unlockStats.hasData) {
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Text(
+                    text = "Phone unlock",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "How intentional you've been when unlocking your phone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
+
+                UnlockStatsCard(
+                    stats = unlockStats,
+                    monitoringEnabled = unlockMonitoringEnabled,
+                )
             } else if (appStats.isNotEmpty() && !globalStats.hasData) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
@@ -274,4 +298,85 @@ private fun buildAppStatsSummary(stats: PurposeStats): String {
         parts += "${stats.preventedEntries} paused"
     }
     return parts.joinToString(" · ").ifEmpty { "No visits yet" }
+}
+
+@Composable
+private fun UnlockStatsCard(
+    stats: PurposeStats,
+    monitoringEnabled: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainerHigh),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 16.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = SecondaryTeal,
+                    modifier = Modifier
+                        .padding(end = 14.dp)
+                        .size(40.dp),
+                )
+                Column {
+                    Text(
+                        text = "Device unlock",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = if (monitoringEnabled) "Monitoring active" else "Monitoring off",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (!stats.hasData) {
+                Text(
+                    text = "Unlock your phone to start collecting statistics.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = buildAppStatsSummary(stats),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                if (stats.total > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AccomplishmentProgressCard(stats = stats)
+                }
+
+                if (stats.preventedEntries > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MindfulPausesCard(
+                        count = stats.preventedEntries,
+                        description = "Stillness stopped you from unlocking your phone without a clear purpose.",
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = reflectionMessage(stats, "your phone"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
 }

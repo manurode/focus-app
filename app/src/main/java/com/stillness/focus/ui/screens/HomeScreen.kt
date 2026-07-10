@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -53,7 +56,7 @@ fun PermissionsScreen(
         )
         Text(
             text = if (accessibilityEnabled) {
-                "Stillness can now detect when you open or leave your selected apps."
+                "Stillness can now detect when you unlock your phone or open your selected apps."
             } else {
                 "Stillness needs Accessibility access to work. Without it, the app cannot intercept your selected apps. Your data stays on your device."
             },
@@ -88,6 +91,9 @@ fun PermissionsScreen(
 fun HomeScreen(
     blockedCount: Int,
     globalStats: PurposeStats,
+    unlockMonitoringEnabled: Boolean,
+    unlockStats: PurposeStats,
+    onUnlockMonitoringChange: (Boolean) -> Unit,
     onViewStats: () -> Unit,
     onEditApps: () -> Unit,
 ) {
@@ -121,9 +127,17 @@ fun HomeScreen(
 
         ProtectionStatusCard(blockedCount = blockedCount)
 
-        if (globalStats.hasData) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        UnlockMonitoringCard(
+            enabled = unlockMonitoringEnabled,
+            onEnabledChange = onUnlockMonitoringChange,
+        )
+
+        val combinedStats = globalStats + unlockStats
+        if (combinedStats.hasData) {
             Spacer(modifier = Modifier.height(16.dp))
-            AccomplishmentProgressCard(stats = globalStats)
+            AccomplishmentProgressCard(stats = combinedStats)
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -184,6 +198,57 @@ private fun ProtectionStatusCard(blockedCount: Int) {
                     textAlign = TextAlign.Start,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun UnlockMonitoringCard(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceContainerHigh),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = SecondaryTeal,
+                modifier = Modifier.padding(end = 16.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Monitor on unlock",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = if (enabled) {
+                        "Ask for your purpose when you unlock your phone."
+                    } else {
+                        "Off — only monitored apps are intercepted."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Start,
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = SecondaryTeal,
+                ),
+            )
         }
     }
 }

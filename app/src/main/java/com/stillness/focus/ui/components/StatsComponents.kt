@@ -159,6 +159,7 @@ fun MindfulPausesCard(
 
 fun reflectionMessage(stats: PurposeStats, appLabel: String? = null): String {
     val subject = appLabel ?: "this app"
+    val action = if (subject == "your phone") "unlocking" else "opening"
 
     if (stats.total <= 1) {
         return "This is just the beginning. Pay attention to whether ${
@@ -170,10 +171,10 @@ fun reflectionMessage(stats: PurposeStats, appLabel: String? = null): String {
     return when {
         failureRate >= 0.7f ->
             "Most of the time you leave without accomplishing your purpose. " +
-                "Maybe $subject isn't helping you — consider using it less."
+                "Maybe $action $subject isn't helping you — consider doing it less."
         failureRate >= 0.5f ->
             "More often than not, you don't accomplish what you set out to do. " +
-                "Is opening $subject worth it?"
+                "Is $action $subject worth it?"
         failureRate >= 0.3f ->
             "You're not always achieving your purpose here. " +
                 "Notice the pattern before it becomes a habit."

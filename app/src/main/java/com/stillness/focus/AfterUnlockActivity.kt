@@ -11,9 +11,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.stillness.focus.data.InstalledAppsRepository
+import com.stillness.focus.data.AppPreferences
 import com.stillness.focus.data.PurposeStats
 import com.stillness.focus.monitor.SessionManager
+import com.stillness.focus.monitor.UnlockMonitor
 import com.stillness.focus.ui.screens.AfterCloseScreen
 import com.stillness.focus.ui.screens.PurposeStatsScreen
 import com.stillness.focus.ui.theme.StillnessTheme
@@ -21,28 +22,39 @@ import com.stillness.focus.util.PurposeAudioPlayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-class AfterCloseActivity : ComponentActivity() {
+class AfterUnlockActivity : ComponentActivity() {
     private val audioPlayer = PurposeAudioPlayer()
     private var isPlaying by mutableStateOf(false)
     private var playbackProgress by mutableFloatStateOf(0f)
     private var reflectionCompleted = false
+    private var chainToBeforeUnlock = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val closedPackage = intent.getStringExtra(EXTRA_CLOSED_PACKAGE)
-        val purposeNote = SessionManager.purposeNote
-        val audioPath = SessionManager.purposeAudioPath
-        val audioDurationMs = SessionManager.purposeAudioDurationMs
-        val waveformSamples = SessionManager.purposeWaveformSamples
-        var hasPlayableAudio = false
+        chainToBeforeUnlock = intent.getBooleanExtra(EXTRA_CHAIN_TO_BEFORE_UNLOCK, false)
 
-        if (closedPackage == null) {
-            SessionManager.isAfterScreenShowing.set(false)
+        val preferences = (application as StillnessApp).preferences
+        val pending = preferences.loadPendingUnlockReflectionBlocking()
+        if (pending == null) {
+            SessionManager.isUnlockAfterShowing.set(false)
             finish()
             return
         }
+
+        SessionManager.loadPendingUnlockReflection(
+            purpose = pending.purpose,
+            audioPath = pending.audioPath,
+            audioDurationMs = pending.audioDurationMs,
+            waveformSamples = pending.waveformSamples,
+        )
+
+        val purposeNote = SessionManager.unlockPurposeNote
+        val audioPath = SessionManager.unlockPurposeAudioPath
+        val audioDurationMs = SessionManager.unlockPurposeAudioDurationMs
+        val waveformSamples = SessionManager.unlockPurposeWaveformSamples
+        var hasPlayableAudio = false
 
         if (audioPath != null) {
             hasPlayableAudio = runCatching {
@@ -52,9 +64,6 @@ class AfterCloseActivity : ComponentActivity() {
                 }
             }.isSuccess
         }
-
-        val preferences = (application as StillnessApp).preferences
-        val appLabel = InstalledAppsRepository(this).getAppLabel(closedPackage)
 
         var showStats by mutableStateOf(false)
         var stats by mutableStateOf(PurposeStats())
@@ -70,7 +79,10 @@ class AfterCloseActivity : ComponentActivity() {
 
                 if (showStats) {
                     PurposeStatsScreen(
-                        subjectLabel = appLabel,
+                        subjectLabel = "your phone",
+                        statsDescription = "Every time you unlock your phone, Stillness asks why. Here's how it's going.",
+                        mindfulPauseDescription = "Stillness stopped you from unlocking your phone without a clear purpose — " +
+                            "catching those automatic checks before they start.",
                         stats = stats,
                         onContinue = { finishReflection() },
                     )
@@ -84,13 +96,13 @@ class AfterCloseActivity : ComponentActivity() {
                         onPlayPause = { togglePlayback() },
                         onNo = {
                             stopPlayback()
-                            preferences.recordNotAccomplishedBlocking(closedPackage)
-                            stats = preferences.getStatsBlocking(closedPackage)
+                            preferences.recordNotAccomplishedBlocking(AppPreferences.UNLOCK_STATS_ID)
+                            stats = preferences.getUnlockStatsBlocking()
                             showStats = true
                         },
                         onYes = {
                             stopPlayback()
-                            preferences.recordAccomplishedBlocking(closedPackage)
+                            preferences.recordAccomplishedBlocking(AppPreferences.UNLOCK_STATS_ID)
                             finishReflection()
                         },
                     )
@@ -128,7 +140,7 @@ class AfterCloseActivity : ComponentActivity() {
     override fun onDestroy() {
         audioPlayer.release()
         if (!reflectionCompleted) {
-            SessionManager.cancelReflection()
+            SessionManager.cancelUnlockReflection()
         }
         super.onDestroy()
     }
@@ -136,22 +148,29 @@ class AfterCloseActivity : ComponentActivity() {
     private fun abandonReflectionIfIncomplete() {
         if (!reflectionCompleted && !isChangingConfigurations) {
             stopPlayback()
-            SessionManager.cancelReflection()
+            SessionManager.cancelUnlockReflection()
         }
     }
 
     private fun finishReflection() {
         reflectionCompleted = true
-        SessionManager.onAfterScreenDismissed()
+        val preferences = (application as StillnessApp).preferences
+        preferences.clearPendingUnlockReflectionBlocking()
+        SessionManager.onUnlockAfterScreenDismissed()
+
+        if (chainToBeforeUnlock && preferences.isUnlockMonitoringEnabledBlocking()) {
+            UnlockMonitor.launchBeforeUnlockFromReflection(this)
+        }
+
         finish()
     }
 
     companion object {
-        private const val EXTRA_CLOSED_PACKAGE = "extra_closed_package"
+        private const val EXTRA_CHAIN_TO_BEFORE_UNLOCK = "extra_chain_to_before_unlock"
 
-        fun createIntent(context: Context, packageName: String): Intent {
-            return Intent(context, AfterCloseActivity::class.java).apply {
-                putExtra(EXTRA_CLOSED_PACKAGE, packageName)
+        fun createIntent(context: Context, chainToBeforeUnlock: Boolean): Intent {
+            return Intent(context, AfterUnlockActivity::class.java).apply {
+                putExtra(EXTRA_CHAIN_TO_BEFORE_UNLOCK, chainToBeforeUnlock)
             }
         }
     }

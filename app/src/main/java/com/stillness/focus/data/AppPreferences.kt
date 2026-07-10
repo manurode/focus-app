@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +20,12 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class AppPreferences(private val context: Context) {
     private val blockedAppsKey = stringSetPreferencesKey("blocked_apps")
     private val setupCompleteKey = booleanPreferencesKey("setup_complete")
+    private val unlockMonitoringKey = booleanPreferencesKey("unlock_monitoring_enabled")
+    private val pendingUnlockReflectionKey = booleanPreferencesKey("pending_unlock_reflection")
+    private val pendingUnlockPurposeKey = stringPreferencesKey("pending_unlock_purpose")
+    private val pendingUnlockAudioPathKey = stringPreferencesKey("pending_unlock_audio_path")
+    private val pendingUnlockAudioDurationKey = longPreferencesKey("pending_unlock_audio_duration")
+    private val pendingUnlockWaveformKey = stringPreferencesKey("pending_unlock_waveform")
 
     val blockedApps: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[blockedAppsKey].orEmpty()
@@ -25,6 +33,10 @@ class AppPreferences(private val context: Context) {
 
     val setupComplete: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[setupCompleteKey] ?: false
+    }
+
+    val unlockMonitoringEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[unlockMonitoringKey] ?: false
     }
 
     suspend fun setBlockedApps(packages: Set<String>) {
@@ -39,12 +51,91 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun setUnlockMonitoringEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[unlockMonitoringKey] = enabled
+        }
+    }
+
     fun getBlockedPackagesBlocking(): Set<String> = runBlocking {
         blockedApps.first()
     }
 
     fun isSetupCompleteBlocking(): Boolean = runBlocking {
         setupComplete.first()
+    }
+
+    fun isUnlockMonitoringEnabledBlocking(): Boolean = runBlocking {
+        unlockMonitoringEnabled.first()
+    }
+
+    suspend fun getUnlockStats(): PurposeStats = getStats(UNLOCK_STATS_ID)
+
+    fun getUnlockStatsBlocking(): PurposeStats = getStatsBlocking(UNLOCK_STATS_ID)
+
+    suspend fun savePendingUnlockReflection(
+        purpose: String,
+        audioPath: String?,
+        audioDurationMs: Long,
+        waveformSamples: List<Float>,
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[pendingUnlockReflectionKey] = true
+            prefs[pendingUnlockPurposeKey] = purpose
+            if (audioPath != null) {
+                prefs[pendingUnlockAudioPathKey] = audioPath
+            } else {
+                prefs.remove(pendingUnlockAudioPathKey)
+            }
+            prefs[pendingUnlockAudioDurationKey] = audioDurationMs
+            prefs[pendingUnlockWaveformKey] = encodeWaveform(waveformSamples)
+        }
+    }
+
+    fun savePendingUnlockReflectionBlocking(
+        purpose: String,
+        audioPath: String?,
+        audioDurationMs: Long,
+        waveformSamples: List<Float>,
+    ) = runBlocking {
+        savePendingUnlockReflection(purpose, audioPath, audioDurationMs, waveformSamples)
+    }
+
+    suspend fun loadPendingUnlockReflection(): PendingUnlockReflection? {
+        val prefs = context.dataStore.data.first()
+        if (prefs[pendingUnlockReflectionKey] != true) return null
+        return PendingUnlockReflection(
+            purpose = prefs[pendingUnlockPurposeKey].orEmpty(),
+            audioPath = prefs[pendingUnlockAudioPathKey],
+            audioDurationMs = prefs[pendingUnlockAudioDurationKey] ?: 0L,
+            waveformSamples = decodeWaveform(prefs[pendingUnlockWaveformKey]),
+        )
+    }
+
+    fun loadPendingUnlockReflectionBlocking(): PendingUnlockReflection? = runBlocking {
+        loadPendingUnlockReflection()
+    }
+
+    suspend fun clearPendingUnlockReflection() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(pendingUnlockReflectionKey)
+            prefs.remove(pendingUnlockPurposeKey)
+            prefs.remove(pendingUnlockAudioPathKey)
+            prefs.remove(pendingUnlockAudioDurationKey)
+            prefs.remove(pendingUnlockWaveformKey)
+        }
+    }
+
+    fun clearPendingUnlockReflectionBlocking() = runBlocking {
+        clearPendingUnlockReflection()
+    }
+
+    suspend fun hasPendingUnlockReflection(): Boolean {
+        return context.dataStore.data.first()[pendingUnlockReflectionKey] == true
+    }
+
+    fun hasPendingUnlockReflectionBlocking(): Boolean = runBlocking {
+        hasPendingUnlockReflection()
     }
 
     suspend fun recordAccomplished(packageName: String) {
@@ -117,4 +208,23 @@ class AppPreferences(private val context: Context) {
 
     private fun preventedEntryKey(packageName: String) =
         intPreferencesKey("stats_prevented_entry_$packageName")
+
+    private fun encodeWaveform(samples: List<Float>): String =
+        samples.joinToString(",") { it.toString() }
+
+    private fun decodeWaveform(raw: String?): List<Float> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return raw.split(",").mapNotNull { it.toFloatOrNull() }
+    }
+
+    companion object {
+        const val UNLOCK_STATS_ID = "__device_unlock__"
+    }
 }
+
+data class PendingUnlockReflection(
+    val purpose: String,
+    val audioPath: String?,
+    val audioDurationMs: Long,
+    val waveformSamples: List<Float>,
+)

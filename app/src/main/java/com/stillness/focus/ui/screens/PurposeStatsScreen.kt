@@ -29,9 +29,12 @@ import com.stillness.focus.ui.theme.TertiaryLavender
 
 @Composable
 fun PurposeStatsScreen(
-    appLabel: String,
+    subjectLabel: String,
     stats: PurposeStats,
     onContinue: () -> Unit,
+    statsDescription: String = "Every time you open $subjectLabel, Stillness asks why. Here's how it's going.",
+    mindfulPauseDescription: String = "Stillness stopped you from opening $subjectLabel without a clear purpose — " +
+        "catching those automatic opens before they start.",
 ) {
     Column(
         modifier = Modifier
@@ -57,7 +60,7 @@ fun PurposeStatsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Every time you open $appLabel, Stillness asks why. Here's how it's going.",
+                text = statsDescription,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -91,15 +94,14 @@ fun PurposeStatsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 MindfulPausesCard(
                     count = stats.preventedEntries,
-                    description = "Stillness stopped you from opening $appLabel without a clear purpose — " +
-                        "catching those automatic opens before they start.",
+                    description = mindfulPauseDescription,
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = reflectionMessage(stats, appLabel),
+                text = reflectionMessage(stats, subjectLabel),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

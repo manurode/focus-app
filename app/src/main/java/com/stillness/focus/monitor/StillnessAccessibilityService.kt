@@ -10,6 +10,15 @@ import com.stillness.focus.util.isAccessibilityServiceEnabled
 
 class StillnessAccessibilityService : AccessibilityService() {
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        UnlockMonitorController.sync(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
@@ -31,6 +40,10 @@ class StillnessAccessibilityService : AccessibilityService() {
     }
 
     private fun handleBlockedAppOpened(packageName: String) {
+        if (SessionManager.isUnlockBeforeShowing.get() || SessionManager.isUnlockAfterShowing.get()) {
+            return
+        }
+
         if (SessionManager.allowedPackage == packageName &&
             !SessionManager.isAfterScreenShowing.get()
         ) {
@@ -55,6 +68,10 @@ class StillnessAccessibilityService : AccessibilityService() {
     }
 
     private fun handleLeftBlockedApp(blockedApps: Set<String>) {
+        if (SessionManager.isUnlockBeforeShowing.get() || SessionManager.isUnlockAfterShowing.get()) {
+            return
+        }
+
         val activePackage = SessionManager.activeBlockedPackage ?: return
         if (activePackage !in blockedApps) return
 
