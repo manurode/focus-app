@@ -55,6 +55,7 @@ class BeforeOpenActivity : ComponentActivity() {
 
         val appLabel = InstalledAppsRepository(this).getAppLabel(packageName)
         var purpose by mutableStateOf("")
+        var selectedTimeLimitMs by mutableStateOf<Long?>(null)
 
         setContent {
             StillnessTheme {
@@ -72,8 +73,10 @@ class BeforeOpenActivity : ComponentActivity() {
                     purpose = purpose,
                     isRecording = isRecording,
                     hasRecording = hasRecording,
+                    selectedTimeLimitMs = selectedTimeLimitMs,
                     onPurposeChange = { purpose = it },
                     onMicClick = { handleMicClick() },
+                    onTimeLimitSelected = { selectedTimeLimitMs = it },
                     onProceed = {
                         if (isRecording) {
                             finishRecording()
@@ -86,6 +89,7 @@ class BeforeOpenActivity : ComponentActivity() {
                             audioPath = currentRecording?.filePath,
                             audioDurationMs = currentRecording?.durationMs ?: 0L,
                             waveformSamples = currentRecording?.waveformSamples ?: emptyList(),
+                            timeLimitMs = selectedTimeLimitMs,
                         )
                         launchTargetApp(packageName)
                         finish()

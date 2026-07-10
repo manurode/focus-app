@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.stillness.focus.ui.components.StillnessPrimaryButton
 import com.stillness.focus.ui.components.StillnessTopBar
+import com.stillness.focus.ui.theme.OnSecondary
 import com.stillness.focus.ui.theme.SecondaryTeal
 import com.stillness.focus.ui.theme.SurfaceContainerHigh
 
@@ -47,8 +50,10 @@ fun BeforeOpenScreen(
     purpose: String,
     isRecording: Boolean,
     hasRecording: Boolean,
+    selectedTimeLimitMs: Long?,
     onPurposeChange: (String) -> Unit,
     onMicClick: () -> Unit,
+    onTimeLimitSelected: (Long?) -> Unit,
     onProceed: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -178,11 +183,76 @@ fun BeforeOpenScreen(
             ),
         )
 
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "Time limit (optional)",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TIME_LIMIT_OPTIONS.forEach { (label, durationMs) ->
+                TimeLimitChip(
+                    label = label,
+                    selected = selectedTimeLimitMs == durationMs,
+                    onClick = {
+                        onTimeLimitSelected(
+                            if (selectedTimeLimitMs == durationMs) null else durationMs,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
         StillnessPrimaryButton(
             text = "Proceed",
             onClick = onProceed,
             enabled = canProceed,
             modifier = Modifier.padding(vertical = 24.dp),
+        )
+    }
+}
+
+private val TIME_LIMIT_OPTIONS = listOf(
+    "1 min" to 60_000L,
+    "3 min" to 180_000L,
+    "5 min" to 300_000L,
+)
+
+@Composable
+private fun TimeLimitChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                if (selected) SecondaryTeal else SurfaceContainerHigh,
+            )
+            .border(
+                width = 1.dp,
+                color = if (selected) SecondaryTeal else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(22.dp),
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (selected) OnSecondary else MaterialTheme.colorScheme.onSurface,
         )
     }
 }

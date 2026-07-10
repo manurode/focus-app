@@ -22,6 +22,14 @@ object SessionManager {
     @Volatile
     var purposeWaveformSamples: List<Float> = emptyList()
 
+    @Volatile
+    var sessionTimeLimitMs: Long? = null
+
+    @Volatile
+    var sessionEndTimeMs: Long = 0L
+
+    val sessionAfterCloseTriggered = AtomicBoolean(false)
+
     val isBeforeScreenShowing = AtomicBoolean(false)
     val isAfterScreenShowing = AtomicBoolean(false)
 
@@ -31,6 +39,7 @@ object SessionManager {
         audioPath: String? = null,
         audioDurationMs: Long = 0L,
         waveformSamples: List<Float> = emptyList(),
+        timeLimitMs: Long? = null,
     ) {
         allowedPackage = packageName
         activeBlockedPackage = packageName
@@ -38,8 +47,19 @@ object SessionManager {
         purposeAudioPath = audioPath
         purposeAudioDurationMs = audioDurationMs
         purposeWaveformSamples = waveformSamples
+        sessionTimeLimitMs = timeLimitMs
+        sessionEndTimeMs = if (timeLimitMs != null) {
+            System.currentTimeMillis() + timeLimitMs
+        } else {
+            0L
+        }
+        sessionAfterCloseTriggered.set(false)
         isBeforeScreenShowing.set(false)
     }
+
+    fun hasActiveTimeLimit(): Boolean = sessionTimeLimitMs != null && sessionEndTimeMs > 0L
+
+    fun markAfterCloseTriggered(): Boolean = sessionAfterCloseTriggered.compareAndSet(false, true)
 
     fun markActiveInBlockedApp(packageName: String) {
         activeBlockedPackage = packageName
@@ -55,6 +75,9 @@ object SessionManager {
         purposeAudioPath = null
         purposeAudioDurationMs = 0L
         purposeWaveformSamples = emptyList()
+        sessionTimeLimitMs = null
+        sessionEndTimeMs = 0L
+        sessionAfterCloseTriggered.set(false)
         isBeforeScreenShowing.set(false)
         isAfterScreenShowing.set(false)
     }

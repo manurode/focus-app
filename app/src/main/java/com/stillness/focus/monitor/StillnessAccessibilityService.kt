@@ -17,6 +17,7 @@ class StillnessAccessibilityService : AccessibilityService() {
 
     private val leaveVerificationHandler = Handler(Looper.getMainLooper())
     private var pendingLeaveVerification: Runnable? = null
+    private var sessionTimerRunnable: Runnable? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -44,6 +45,7 @@ class StillnessAccessibilityService : AccessibilityService() {
             !SessionManager.isAfterScreenShowing.get()
         ) {
             SessionManager.markActiveInBlockedApp(packageName)
+            startSessionTimerIfNeeded()
             return
         }
 
@@ -83,7 +85,53 @@ class StillnessAccessibilityService : AccessibilityService() {
         pendingLeaveVerification = null
     }
 
+    private fun startSessionTimerIfNeeded() {
+        cancelSessionTimer()
+        if (!SessionManager.hasActiveTimeLimit()) return
+        if (SessionManager.sessionAfterCloseTriggered.get()) return
+
+        val activePackage = SessionManager.allowedPackage ?: return
+        val remainingMs = SessionManager.sessionEndTimeMs - System.currentTimeMillis()
+        if (remainingMs <= 0) {
+            onSessionTimerExpired(activePackage)
+            return
+        }
+
+        sessionTimerRunnable = Runnable {
+            sessionTimerRunnable = null
+            onSessionTimerExpired(activePackage)
+        }
+        leaveVerificationHandler.postDelayed(sessionTimerRunnable!!, remainingMs)
+    }
+
+    private fun onSessionTimerExpired(activePackage: String) {
+        if (SessionManager.sessionAfterCloseTriggered.get()) return
+        if (SessionManager.isAfterScreenShowing.get()) return
+        if (SessionManager.activeBlockedPackage != activePackage) return
+
+        logDebug("session time limit reached for $activePackage")
+        showAfterCloseScreen(activePackage)
+    }
+
+    private fun cancelSessionTimer() {
+        sessionTimerRunnable?.let { leaveVerificationHandler.removeCallbacks(it) }
+        sessionTimerRunnable = null
+    }
+
+    private fun showAfterCloseScreen(activePackage: String) {
+        cancelSessionTimer()
+        SessionManager.markAfterCloseTriggered()
+        SessionManager.activeBlockedPackage = null
+
+        if (!SessionManager.isAfterScreenShowing.compareAndSet(false, true)) return
+
+        val intent = AfterCloseActivity.createIntent(this, activePackage).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        startActivity(intent)
+    }
     private fun verifyUserLeftBlockedApp(activePackage: String, attempt: Int = 0) {
+        if (SessionManager.sessionAfterCloseTriggered.get()) return
         if (SessionManager.activeBlockedPackage != activePackage) return
         if (SessionManager.isAfterScreenShowing.get()) return
 
@@ -113,17 +161,6 @@ class StillnessAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun showAfterCloseScreen(activePackage: String) {
-        SessionManager.activeBlockedPackage = null
-
-        if (SessionManager.isAfterScreenShowing.compareAndSet(false, true)) {
-            val intent = AfterCloseActivity.createIntent(this, activePackage).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-            startActivity(intent)
-        }
-    }
-
     private fun logDebug(message: String) {
         Log.d(TAG, message)
     }
@@ -132,6 +169,7 @@ class StillnessAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         cancelPendingLeaveVerification()
+        cancelSessionTimer()
         super.onDestroy()
     }
 
