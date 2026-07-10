@@ -30,6 +30,9 @@ object SessionManager {
 
     val sessionAfterCloseTriggered = AtomicBoolean(false)
 
+    @Volatile
+    var sessionEndedByTimer: Boolean = false
+
     val isBeforeScreenShowing = AtomicBoolean(false)
     val isAfterScreenShowing = AtomicBoolean(false)
 
@@ -54,6 +57,7 @@ object SessionManager {
             0L
         }
         sessionAfterCloseTriggered.set(false)
+        sessionEndedByTimer = false
         isBeforeScreenShowing.set(false)
     }
 
@@ -78,6 +82,7 @@ object SessionManager {
         sessionTimeLimitMs = null
         sessionEndTimeMs = 0L
         sessionAfterCloseTriggered.set(false)
+        sessionEndedByTimer = false
         isBeforeScreenShowing.set(false)
         isAfterScreenShowing.set(false)
     }

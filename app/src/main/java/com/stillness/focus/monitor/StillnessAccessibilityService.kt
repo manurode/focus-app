@@ -110,7 +110,15 @@ class StillnessAccessibilityService : AccessibilityService() {
         if (SessionManager.activeBlockedPackage != activePackage) return
 
         logDebug("session time limit reached for $activePackage")
-        showAfterCloseScreen(activePackage)
+        SessionManager.sessionEndedByTimer = true
+        goHome()
+        leaveVerificationHandler.postDelayed({
+            showAfterCloseScreen(activePackage)
+        }, HOME_TRANSITION_DELAY_MS)
+    }
+
+    private fun goHome() {
+        performGlobalAction(GLOBAL_ACTION_HOME)
     }
 
     private fun cancelSessionTimer() {
@@ -178,6 +186,7 @@ class StillnessAccessibilityService : AccessibilityService() {
         private const val LEAVE_VERIFICATION_DELAY_MS = 500L
         private const val VERIFICATION_RETRY_DELAY_MS = 400L
         private const val MAX_VERIFICATION_ATTEMPTS = 2
+        private const val HOME_TRANSITION_DELAY_MS = 300L
 
         fun isEnabled(context: android.content.Context): Boolean {
             return isAccessibilityServiceEnabled(context, StillnessAccessibilityService::class.java)

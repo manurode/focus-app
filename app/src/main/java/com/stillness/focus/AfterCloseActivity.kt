@@ -142,8 +142,21 @@ class AfterCloseActivity : ComponentActivity() {
 
     private fun finishReflection() {
         reflectionCompleted = true
+        val endedByTimer = SessionManager.sessionEndedByTimer
         SessionManager.onAfterScreenDismissed()
+        if (endedByTimer) {
+            goHome()
+        }
         finish()
+    }
+
+    private fun goHome() {
+        startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            },
+        )
     }
 
     companion object {
