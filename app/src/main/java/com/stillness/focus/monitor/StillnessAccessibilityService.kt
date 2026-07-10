@@ -9,20 +9,14 @@ import android.view.accessibility.AccessibilityEvent
 import com.stillness.focus.AfterCloseActivity
 import com.stillness.focus.BeforeOpenActivity
 import com.stillness.focus.StillnessApp
+import com.stillness.focus.util.ForegroundState
+import com.stillness.focus.util.detectForegroundState
 import com.stillness.focus.util.isAccessibilityServiceEnabled
-import com.stillness.focus.util.isLauncherPackage
-import com.stillness.focus.util.isTransientForegroundChange
-import com.stillness.focus.util.isTransientForegroundPackage
 
 class StillnessAccessibilityService : AccessibilityService() {
 
-    private val leaveConfirmationHandler = Handler(Looper.getMainLooper())
-    private var pendingLeaveRunnable: Runnable? = null
-    private var pendingLeaveDestination: String? = null
-    private var lastBlockedAppForegroundTime = 0L
-    private var lastTransientOverlayTime = 0L
-    private var lastShadeCloseTime = 0L
-    private var notificationShadeOpen = false
+    private val leaveVerificationHandler = Handler(Looper.getMainLooper())
+    private var pendingLeaveVerification: Runnable? = null
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -38,66 +32,10 @@ class StillnessAccessibilityService : AccessibilityService() {
         if (blockedApps.isEmpty()) return
 
         if (packageName in blockedApps) {
-            notificationShadeOpen = false
-            onBlockedAppForeground(packageName)
-            cancelPendingLeaveConfirmation()
+            cancelPendingLeaveVerification()
             handleBlockedAppOpened(packageName)
-        } else if (event.isTransientForegroundChange(applicationContext)) {
-            onTransientOverlay(packageName, event.className?.toString())
-        } else {
-            handleSuspectedLeave(blockedApps, packageName, event.className?.toString())
-        }
-    }
-
-    private fun onTransientOverlay(packageName: String, className: String?) {
-        lastTransientOverlayTime = System.currentTimeMillis()
-        if (!notificationShadeOpen) {
-            notificationShadeOpen = true
-            logDebug("notification shade opened")
-        } else {
-            notificationShadeOpen = false
-            lastShadeCloseTime = System.currentTimeMillis()
-            logDebug("notification shade closed")
-        }
-        cancelPendingLeaveConfirmation()
-        logEvent("ignored transient overlay", packageName, className)
-    }
-
-    private fun handleSuspectedLeave(
-        blockedApps: Set<String>,
-        destinationPackage: String,
-        className: String?,
-    ) {
-        logEvent("suspected leave", destinationPackage, className)
-
-        if (applicationContext.isLauncherPackage(destinationPackage) &&
-            shouldIgnoreLauncherAfterNotificationShade()
-        ) {
-            return
-        }
-
-        scheduleLeaveConfirmation(blockedApps, destinationPackage)
-    }
-
-    private fun shouldIgnoreLauncherAfterNotificationShade(): Boolean {
-        if (notificationShadeOpen) {
-            notificationShadeOpen = false
-            lastShadeCloseTime = System.currentTimeMillis()
-            logDebug("ignored launcher triggered by notification shade close")
-            return true
-        }
-        if (isWithinShadeCloseGracePeriod()) {
-            logDebug("ignored launcher within shade close grace period")
-            return true
-        }
-        return false
-    }
-
-    private fun onBlockedAppForeground(packageName: String) {
-        if (SessionManager.allowedPackage == packageName ||
-            SessionManager.activeBlockedPackage == packageName
-        ) {
-            lastBlockedAppForegroundTime = System.currentTimeMillis()
+        } else if (SessionManager.activeBlockedPackage != null) {
+            scheduleLeaveVerification()
         }
     }
 
@@ -125,80 +63,57 @@ class StillnessAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun scheduleLeaveConfirmation(blockedApps: Set<String>, destinationPackage: String) {
+    private fun scheduleLeaveVerification() {
         val activePackage = SessionManager.activeBlockedPackage ?: return
-        if (activePackage !in blockedApps) return
-        if (destinationPackage == activePackage) return
-        if (isTransientForegroundPackage(applicationContext, destinationPackage)) return
 
-        pendingLeaveRunnable?.let { leaveConfirmationHandler.removeCallbacks(it) }
-        pendingLeaveDestination = destinationPackage
+        pendingLeaveVerification?.let { leaveVerificationHandler.removeCallbacks(it) }
 
-        val delayMs = if (applicationContext.isLauncherPackage(destinationPackage)) {
-            LAUNCHER_LEAVE_DELAY_MS
-        } else {
-            LEAVE_CONFIRMATION_DELAY_MS
+        pendingLeaveVerification = Runnable {
+            pendingLeaveVerification = null
+            verifyUserLeftBlockedApp(activePackage)
         }
-
-        pendingLeaveRunnable = Runnable {
-            pendingLeaveRunnable = null
-            val destination = pendingLeaveDestination
-            pendingLeaveDestination = null
-            if (destination != null) {
-                confirmLeftBlockedApp(activePackage, destination, blockedApps)
-            }
-        }
-        leaveConfirmationHandler.postDelayed(pendingLeaveRunnable!!, delayMs)
+        leaveVerificationHandler.postDelayed(
+            pendingLeaveVerification!!,
+            LEAVE_VERIFICATION_DELAY_MS,
+        )
     }
 
-    private fun cancelPendingLeaveConfirmation() {
-        pendingLeaveRunnable?.let { leaveConfirmationHandler.removeCallbacks(it) }
-        pendingLeaveRunnable = null
-        pendingLeaveDestination = null
+    private fun cancelPendingLeaveVerification() {
+        pendingLeaveVerification?.let { leaveVerificationHandler.removeCallbacks(it) }
+        pendingLeaveVerification = null
     }
 
-    private fun confirmLeftBlockedApp(
-        activePackage: String,
-        destinationPackage: String,
-        blockedApps: Set<String>,
-    ) {
+    private fun verifyUserLeftBlockedApp(activePackage: String, attempt: Int = 0) {
         if (SessionManager.activeBlockedPackage != activePackage) return
         if (SessionManager.isAfterScreenShowing.get()) return
-        if (destinationPackage == activePackage) return
-        if (isTransientForegroundPackage(applicationContext, destinationPackage)) return
 
-        if (applicationContext.isLauncherPackage(destinationPackage) &&
-            isWithinShadeCloseGracePeriod()
+        when (
+            val state = detectForegroundState(
+                activeBlockedPackage = activePackage,
+                ownPackage = applicationContext.packageName,
+            )
         ) {
-            logDebug("leave confirmation aborted: shade close grace period")
-            return
-        }
-        if (isWithinOverlayGracePeriod()) {
-            logDebug("leave confirmation aborted: overlay grace period")
-            return
-        }
-        if (isWithinRecentBlockedAppGracePeriod()) {
-            logDebug("leave confirmation aborted: recent blocked app foreground")
-            return
-        }
+            ForegroundState.InBlockedApp -> {
+                logDebug("still in blocked app: $activePackage")
+            }
 
-        val foregroundPackage = getForegroundPackage()
-        logDebug(
-            "confirm leave active=$activePackage destination=$destinationPackage foreground=$foregroundPackage",
-        )
+            is ForegroundState.InOtherApp -> {
+                logDebug("left blocked app for ${state.packageName}")
+                showAfterCloseScreen(activePackage)
+            }
 
-        if (foregroundPackage == activePackage) return
-        if (foregroundPackage != null &&
-            isTransientForegroundPackage(applicationContext, foregroundPackage)
-        ) {
-            return
+            ForegroundState.Unknown -> {
+                logDebug("foreground unknown while checking leave from $activePackage")
+                if (attempt < MAX_VERIFICATION_ATTEMPTS) {
+                    leaveVerificationHandler.postDelayed({
+                        verifyUserLeftBlockedApp(activePackage, attempt + 1)
+                    }, VERIFICATION_RETRY_DELAY_MS)
+                }
+            }
         }
-
-        showAfterCloseScreen(activePackage)
     }
 
     private fun showAfterCloseScreen(activePackage: String) {
-        logDebug("leave confirmed for $activePackage")
         SessionManager.activeBlockedPackage = null
 
         if (SessionManager.isAfterScreenShowing.compareAndSet(false, true)) {
@@ -209,32 +124,6 @@ class StillnessAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun isWithinOverlayGracePeriod(): Boolean {
-        return System.currentTimeMillis() - lastTransientOverlayTime < OVERLAY_GRACE_PERIOD_MS
-    }
-
-    private fun isWithinShadeCloseGracePeriod(): Boolean {
-        return System.currentTimeMillis() - lastShadeCloseTime < SHADE_CLOSE_GRACE_MS
-    }
-
-    private fun isWithinRecentBlockedAppGracePeriod(): Boolean {
-        return System.currentTimeMillis() - lastBlockedAppForegroundTime < RECENT_BLOCKED_APP_GRACE_MS
-    }
-
-    private fun getForegroundPackage(): String? {
-        val root = rootInActiveWindow ?: return null
-        return try {
-            root.packageName?.toString()
-        } finally {
-            @Suppress("DEPRECATION")
-            root.recycle()
-        }
-    }
-
-    private fun logEvent(message: String, packageName: String, className: String?) {
-        logDebug("$message pkg=$packageName class=$className")
-    }
-
     private fun logDebug(message: String) {
         Log.d(TAG, message)
     }
@@ -242,17 +131,15 @@ class StillnessAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
-        cancelPendingLeaveConfirmation()
+        cancelPendingLeaveVerification()
         super.onDestroy()
     }
 
     companion object {
         private const val TAG = "StillnessMonitor"
-        private const val LEAVE_CONFIRMATION_DELAY_MS = 400L
-        private const val LAUNCHER_LEAVE_DELAY_MS = 750L
-        private const val OVERLAY_GRACE_PERIOD_MS = 1_000L
-        private const val SHADE_CLOSE_GRACE_MS = 1_500L
-        private const val RECENT_BLOCKED_APP_GRACE_MS = 800L
+        private const val LEAVE_VERIFICATION_DELAY_MS = 500L
+        private const val VERIFICATION_RETRY_DELAY_MS = 400L
+        private const val MAX_VERIFICATION_ATTEMPTS = 2
 
         fun isEnabled(context: android.content.Context): Boolean {
             return isAccessibilityServiceEnabled(context, StillnessAccessibilityService::class.java)
